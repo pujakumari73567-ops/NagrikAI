@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NagrikAI - Orchestrator Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8 font-sans">
+
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-bold text-blue-900 mb-2">NagrikAI Control Center</h1>
+        <p class="text-gray-600 mb-8">AI-Triaged Civic Issues (Real-time monitoring)</p>
+
+        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+            <table class="min-w-full text-left border-collapse">
+                <thead class="bg-blue-800 text-white">
+                    <tr>
+                        <th class="py-3 px-4 font-semibold text-sm">Category</th>
+                        <th class="py-3 px-4 font-semibold text-sm">AI Description</th>
+                        <th class="py-3 px-4 font-semibold text-sm">AI SOP (Action Plan)</th>
+                        <th class="py-3 px-4 font-semibold text-sm">Severity</th>
+                        <th class="py-3 px-4 font-semibold text-sm text-center">Upvotes</th>
+                        <th class="py-3 px-4 font-semibold text-sm">Status</th>
+                        <th class="py-3 px-4 font-semibold text-sm">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="complaints-table" class="divide-y divide-gray-200">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+        // 🚨 PASTE YOUR FIREBASE CONFIG HERE 🚨
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Reference to the table body
+        const tableBody = document.getElementById('complaints-table');
+
+        // Real-time listener for the 'complaints' collection
+        onSnapshot(collection(db, "complaints"), (snapshot) => {
+            tableBody.innerHTML = ""; // Clear existing rows
+            
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                const id = docSnap.id;
+                
+                // Styling logic based on status and severity
+                const statusBadge = data.status === "Pending" 
+                    ? `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>`
+                    : `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">In Progress</span>`;
+                
+                const severityColor = data.severity === "Critical" || data.severity === "High" ? "text-red-600 font-bold" : "text-orange-500";
+
+                const row = document.createElement('tr');
+                row.className = "hover:bg-gray-50 transition-colors";
+                row.innerHTML = `
+                    <td class="py-3 px-4 text-sm text-gray-900 font-medium">${data.category || 'N/A'}</td>
+                    <td class="py-3 px-4 text-sm text-gray-600 max-w-xs truncate" title="${data.description}">${data.description || 'N/A'}</td>
+                    <td class="py-3 px-4 text-sm text-gray-600 max-w-xs truncate" title="${data.sop}">${data.sop || 'N/A'}</td>
+                    <td class="py-3 px-4 text-sm ${severityColor}">${data.severity || 'Medium'}</td>
+                    <td class="py-3 px-4 text-sm text-center font-bold text-blue-600">${data.upvotes || 1}</td>
+                    <td class="py-3 px-4 whitespace-nowrap">${statusBadge}</td>
+                    <td class="py-3 px-4 whitespace-nowrap">
+                        ${data.status === "Pending" 
+                            ? `<button onclick="approveIssue('${id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs py-1 px-3 rounded shadow transition-all">Approve & Dispatch</button>`
+                            : `<span class="text-xs text-gray-500 font-medium">Dispatched ✅</span>`
+                        }
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        });
+
+        // Make function globally available for the inline onclick event
+        window.approveIssue = async (id) => {
+            try {
+                const issueRef = doc(db, "complaints", id);
+                await updateDoc(issueRef, {
+                    status: "In Progress"
+                });
+                console.log("Issue updated successfully!");
+                // No need to manually update UI, the onSnapshot listener will auto-refresh the row!
+            } catch (error) {
+                console.error("Error updating issue: ", error);
+                alert("Failed to approve issue. Check console.");
+            }
+        }
+    </script>
+</body>
+</html>
