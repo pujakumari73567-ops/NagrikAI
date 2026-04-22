@@ -12,6 +12,9 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel('gemini-1.5-flash')
 from fastapi.middleware.cors import CORSMiddleware
 
+app = FastAPI() 
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,7 +26,7 @@ cred = credentials.Certificate("firebase-key.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-app = FastAPI()
+
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     R = 6371000  # Radius of earth in meters
