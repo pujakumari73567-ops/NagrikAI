@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:dio/dio.dart';
-import 'dart:io';
 
 late List<CameraDescription> _cameras;
 
@@ -19,7 +18,10 @@ class NagrikAIApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: ThemeData(
+        primaryColor: Colors.green[700],
+        colorScheme: ColorScheme.fromSwatch().copyWith(secondary: Colors.blueAccent),
+      ),
       home: const ReportScreen(),
     );
   }
@@ -49,7 +51,10 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Future<void> _submitReport() async {
-    if (imageFile == null) return;
+    if (imageFile == null) {
+      setState(() => status = "Please capture a photo first!");
+      return;
+    }
 
     setState(() {
       isUploading = true;
@@ -57,32 +62,31 @@ class _ReportScreenState extends State<ReportScreen> {
     });
 
     try {
-      // 1. Get Location
-      Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() => status = "Location permission denied");
+          return;
+        }
+      }
 
-      // 2. Prepare Data
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+
       FormData formData = FormData.fromMap({
         "lat": position.latitude.toString(),
         "long": position.longitude.toString(),
         "photo": await MultipartFile.fromFile(imageFile!.path, filename: "report.jpg"),
       });
 
-      // 3. Send to Nidhi's Backend
-      // Nidhi, yahan apna IPv4 address daalo (e.g., http://192.168.1.5:8000)
-      var response = await Dio().post("http://127.0.0.1:8000/submit-complaint", data: formData);
+      String backendUrl = "192.168.1.2/submit"; 
+      var response = await Dio().post(backendUrl, data: formData);
 
-      setState(() {
-        status = "AI Analysis: ${response.data['ai_analysis']}";
-      });
+      setState(() => status = "Success! Data sent to Dashboard.");
     } catch (e) {
-      setState(() {
-        status = "Error: $e";
-      });
+      setState(() => status = "Error: $e");
     } finally {
-      setState(() {
-        isUploading = false;
-      });
+      setState(() => isUploading = false);
     }
   }
 
@@ -93,32 +97,39 @@ class _ReportScreenState extends State<ReportScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("NagrikAI - Report Issue")),
+      appBar: AppBar(
+        title: const Text("NagrikAI - Snap & Report"),
+        backgroundColor: Colors.green[800],
+      ),
       body: Column(
         children: [
           Expanded(child: CameraPreview(controller!)),
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Text(status, style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(status, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
           if (isUploading) const LinearProgressIndicator(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ElevatedButton(
-                onPressed: () async {
-                  imageFile = await controller!.takePicture();
-                  setState(() { status = "Photo Captured!"; });
-                },
-                child: const Text("Capture"),
-              ),
-              ElevatedButton(
-                onPressed: _submitReport,
-                child: const Text("Submit to AI"),
-              ),
-            ],
+          Padding(
+            padding: const EdgeInsets.only(bottom: 30.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.camera_alt),
+                  label: const Text("Capture"),
+                  onPressed: () async {
+                    imageFile = await controller!.takePicture();
+                    setState(() => status = "Photo Captured! Ready to submit.");
+                  },
+                ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.upload),
+                  label: const Text("Submit to AI"),
+                  onPressed: _submitReport,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 20),
         ],
       ),
     );

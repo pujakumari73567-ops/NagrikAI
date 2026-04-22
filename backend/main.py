@@ -10,7 +10,14 @@ from firebase_admin import credentials, firestore
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel('gemini-1.5-flash')
+from fastapi.middleware.cors import CORSMiddleware
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Firebase Initialize
 cred = credentials.Certificate("firebase-key.json")
 firebase_admin.initialize_app(cred)
